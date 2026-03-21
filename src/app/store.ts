@@ -137,11 +137,12 @@ export const useAppStore = create<AppState>((set) => ({
         detail: memory.content,
         sourceNodeId: nodeId,
       }));
+      const manualSuggestions = state.project.suggestions.filter((suggestion) => !suggestion.id.startsWith('live-'));
       return {
         project: {
           ...state.project,
           memories: consolidated,
-          suggestions: [...liveSuggestions, ...state.project.suggestions].slice(0, 20),
+          suggestions: [...liveSuggestions, ...manualSuggestions].slice(0, 20),
         },
       };
     }),
