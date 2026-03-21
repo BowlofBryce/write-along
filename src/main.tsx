@@ -4,6 +4,7 @@ import { App } from '@/app/App';
 import '@/styles/index.css';
 
 window.addEventListener('error', (event) => {
+  console.error('Unhandled renderer error', event.error ?? event.message);
   window.desktopAPI.logRenderer({
     level: 'error',
     message: 'Unhandled renderer error',
@@ -18,6 +19,7 @@ window.addEventListener('error', (event) => {
 });
 
 window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled renderer promise rejection', event.reason);
   window.desktopAPI.logRenderer({
     level: 'error',
     message: 'Unhandled renderer promise rejection',

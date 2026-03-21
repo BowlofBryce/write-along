@@ -110,6 +110,8 @@ The log includes:
 - renderer crashes and failed page loads
 - uncaught renderer errors and unhandled promise rejections
 
+The same diagnostics are also echoed to terminal/stdout while running via `./launcher`, `npm run start`, or `npm run dev`.
+
 ### Configure local AI models in-app
 
 1. Open **Settings** in the AI panel.

@@ -17,6 +17,7 @@ function formatLog(scope: string, message: string, extra?: unknown): string {
 
 function writeLog(scope: string, message: string, extra?: unknown): void {
   const line = formatLog(scope, message, extra);
+  process.stdout.write(`${line}\n`);
   console.log(line);
   if (!logFilePath) return;
   try {
@@ -142,6 +143,8 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   logFilePath = path.join(app.getPath('userData'), 'write-along.log');
+  writeLog('app', 'terminal logging enabled');
+  writeLog('app', 'persistent log file path', { logFilePath });
   writeLog('app', 'application ready', {
     appVersion: app.getVersion(),
     electronVersion: process.versions.electron,
@@ -170,6 +173,13 @@ ipcMain.handle('projects:save', (_, payload: { id: string; title: string; data: 
 ipcMain.handle('settings:get', (_, key: string) => loadSetting(key));
 ipcMain.handle('settings:set', (_, payload: { key: string; value: string }) => saveSetting(payload.key, payload.value));
 ipcMain.on('logs:renderer', (_, payload: { level: 'log' | 'warn' | 'error'; message: string; details?: unknown }) => {
+  if (payload.level === 'error') {
+    console.error(`[renderer] ${payload.message}`, payload.details);
+  } else if (payload.level === 'warn') {
+    console.warn(`[renderer] ${payload.message}`, payload.details);
+  } else {
+    console.log(`[renderer] ${payload.message}`, payload.details);
+  }
   writeLog(`renderer.${payload.level}`, payload.message, payload.details);
 });
 ipcMain.handle('logs:path', () => logFilePath);
