@@ -4,12 +4,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+MODE="${1:-auto}"
+
 if [ ! -d node_modules ]; then
   npm install
 fi
 
-if [ -f dist-electron/main.js ] && [ -d dist ]; then
+if [ "$MODE" = "--dev" ]; then
+  npm run dev
+  exit 0
+fi
+
+if [ "$MODE" = "--build" ]; then
+  npm run build
+fi
+
+if [ ! -f dist-electron/main.js ] || [ ! -f dist/index.html ]; then
+  echo "Desktop build artifacts missing. Running npm run build first..."
+  npm run build
+fi
+
+if [ -f dist-electron/main.js ] && [ -f dist/index.html ]; then
   npm run start
 else
+  echo "Build artifacts still missing, falling back to development mode..."
   npm run dev
 fi

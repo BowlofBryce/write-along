@@ -74,8 +74,12 @@ npm run dev
 
 You can run the repository-root `launcher` executable (double-click in Finder or run `./launcher`).  
 It will install dependencies if needed, then:
-- run the packaged desktop app if `dist` + `dist-electron` exist
-- otherwise run development mode automatically
+- build missing desktop artifacts automatically (`dist` + `dist-electron`) to avoid Electron “Cannot find module ... dist-electron/main.js” errors
+- launch the desktop app once artifacts are ready
+
+Optional launcher modes:
+- `./launcher --dev` → force development mode
+- `./launcher --build` → force a rebuild before launch
 
 ### Configure local AI models in-app
 
