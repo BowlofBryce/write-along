@@ -12,4 +12,6 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   listAIModels: () => ipcRenderer.invoke('ai:list-models'),
   generateAI: (prompt: string) => ipcRenderer.invoke('ai:generate', prompt),
   exportManuscript: (content: string) => ipcRenderer.invoke('dialog:export', content),
+  logRenderer: (payload: { level: 'log' | 'warn' | 'error'; message: string; details?: unknown }) => ipcRenderer.send('logs:renderer', payload),
+  getLogFilePath: () => ipcRenderer.invoke('logs:path'),
 });
