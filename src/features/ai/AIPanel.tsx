@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/app/store';
 import { parseFormattingRequest } from '@/lib/formattingParser';
 import { buildActiveMemorySlate } from '@/lib/memoryEngine';
@@ -33,6 +33,7 @@ export function AIPanel(): JSX.Element {
 
 function SuggestionsTab(): JSX.Element {
   const suggestions = useAppStore((s) => s.project.suggestions);
+  const addSuggestion = useAppStore((s) => s.addSuggestion);
   return (
     <div className="space-y-3">
       {suggestions.map((s) => (
@@ -41,7 +42,17 @@ function SuggestionsTab(): JSX.Element {
           <h3 className="font-medium">{s.title}</h3>
           <p className="text-sm text-slate-400 mt-1">{s.detail}</p>
           <div className="mt-3 flex gap-2 text-xs">
-            <button className="chip">Dismiss</button><button className="chip">Ask why</button><button className="chip">Pin memory</button>
+            <button className="chip">Dismiss</button>
+            <button
+              className="chip"
+              onClick={async () => {
+                const response = await window.desktopAPI.generateAI(`Explain this writing suggestion briefly and concretely:\nTitle: ${s.title}\nDetail: ${s.detail}`);
+                addSuggestion(`Why: ${s.title}`, response);
+              }}
+            >
+              Ask why
+            </button>
+            <button className="chip">Pin memory</button>
           </div>
         </article>
       ))}
@@ -55,14 +66,16 @@ function AskTab(): JSX.Element {
   const active = useMemo(() => buildActiveMemorySlate(memories), [memories]);
   const [answer, setAnswer] = useState('Ask about continuity, callbacks, contradictions, or unresolved threads.');
 
-  function ask(): void {
+  async function ask(): Promise<void> {
     if (!query.trim()) return;
     const relevant = active.filter((m) => query.toLowerCase().split(' ').some((word) => m.text.toLowerCase().includes(word)));
-    setAnswer(
-      relevant.length
-        ? `Explicit: ${relevant[0].text}\nInference: This thread likely remains open.\nConfidence: ${Math.round(relevant[0].confidence * 100)}%`
-        : 'No direct memory match. Try extracting memory from the active scene first.',
+    const memoryContext = relevant.length
+      ? relevant.map((m) => `- ${m.text} (confidence ${Math.round(m.confidence * 100)}%)`).join('\n')
+      : '- No direct memory matches.';
+    const aiAnswer = await window.desktopAPI.generateAI(
+      `You are assisting a novelist. Answer this query in <= 120 words.\nQuery: ${query}\nMemory context:\n${memoryContext}`,
     );
+    setAnswer(aiAnswer);
   }
 
   return (
@@ -99,7 +112,11 @@ function MemoryTab(): JSX.Element {
 
 function ActionsTab(): JSX.Element {
   const queueFormattingCommands = useAppStore((s) => s.queueFormattingCommands);
+  const addSuggestion = useAppStore((s) => s.addSuggestion);
+  const project = useAppStore((s) => s.project);
+  const activeNode = project.structure.find((n) => n.id === project.selectedNodeId);
   const [prompt, setPrompt] = useState('make all chapter titles centered and larger');
+  const [result, setResult] = useState('Run a content or story action to see AI output.');
   return (
     <div className="space-y-3">
       <div className="card text-sm">
@@ -109,25 +126,94 @@ function ActionsTab(): JSX.Element {
       </div>
       <div className="card text-sm">
         <div className="font-medium">Content Actions</div>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs"><button className="chip">Rewrite</button><button className="chip">Shorten</button><button className="chip">Expand</button><button className="chip">Literary voice</button></div>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <button className="chip" onClick={async () => setResult(await window.desktopAPI.generateAI(`Rewrite this passage with clearer flow:\n${JSON.stringify(activeNode?.content ?? '')}`))}>Rewrite</button>
+          <button className="chip" onClick={async () => setResult(await window.desktopAPI.generateAI(`Shorten this passage by about 30% while preserving voice:\n${JSON.stringify(activeNode?.content ?? '')}`))}>Shorten</button>
+          <button className="chip" onClick={async () => setResult(await window.desktopAPI.generateAI(`Expand this passage with sensory detail:\n${JSON.stringify(activeNode?.content ?? '')}`))}>Expand</button>
+          <button className="chip" onClick={async () => setResult(await window.desktopAPI.generateAI(`Rewrite this in a literary voice, preserving meaning:\n${JSON.stringify(activeNode?.content ?? '')}`))}>Literary voice</button>
+        </div>
       </div>
       <div className="card text-sm">
         <div className="font-medium">Story Operations</div>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs"><button className="chip">Summarize scene</button><button className="chip">Extract memory</button><button className="chip">Explain suggestion</button></div>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <button className="chip" onClick={async () => setResult(await window.desktopAPI.generateAI(`Summarize this story scene in 4 bullets:\n${JSON.stringify(activeNode?.content ?? '')}`))}>Summarize scene</button>
+          <button
+            className="chip"
+            onClick={async () => {
+              const response = await window.desktopAPI.generateAI(`Extract one durable memory fact from this scene in one sentence:\n${JSON.stringify(activeNode?.content ?? '')}`);
+              addSuggestion('Extracted memory candidate', response);
+              setResult(response);
+            }}
+          >
+            Extract memory
+          </button>
+          <button className="chip" onClick={async () => setResult(await window.desktopAPI.generateAI('Explain the value of continuity suggestions in one short paragraph.'))}>Explain suggestion</button>
+        </div>
       </div>
+      <pre className="card whitespace-pre-wrap text-xs">{result}</pre>
     </div>
   );
 }
 
 function SettingsTab(): JSX.Element {
   const setOnboardingComplete = useAppStore((s) => s.setOnboardingComplete);
+  const [model, setModel] = useState('llama3.2');
+  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:11434');
+  const [models, setModels] = useState<string[]>([]);
+  const [status, setStatus] = useState('Load available models, then save your preferred defaults.');
+
+  useEffect(() => {
+    (async () => {
+      const savedModel = await window.desktopAPI.getSetting('ai.model');
+      const savedBaseUrl = await window.desktopAPI.getSetting('ai.baseUrl');
+      if (savedModel) setModel(savedModel);
+      if (savedBaseUrl) setBaseUrl(savedBaseUrl);
+    })();
+  }, []);
+
+  async function refreshModels(): Promise<void> {
+    await window.desktopAPI.setSetting({ key: 'ai.baseUrl', value: baseUrl.trim() });
+    const available = await window.desktopAPI.listAIModels();
+    setModels(available);
+    setStatus(available.length ? `Found ${available.length} model(s).` : 'No models returned. Check runtime URL and pull a model.');
+  }
+
+  async function saveAISettings(): Promise<void> {
+    await window.desktopAPI.setSetting({ key: 'ai.model', value: model.trim() });
+    await window.desktopAPI.setSetting({ key: 'ai.baseUrl', value: baseUrl.trim() });
+    setStatus(`Saved AI settings. Active model: ${model.trim()}`);
+  }
+
   return (
     <div className="space-y-3 card text-sm">
       <div className="font-medium">Diagnostics</div>
+      <div className="space-y-2">
+        <label className="block text-xs text-slate-400">Local runtime URL</label>
+        <input className="input" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://127.0.0.1:11434" />
+      </div>
+      <div className="space-y-2">
+        <label className="block text-xs text-slate-400">Default model</label>
+        <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="llama3.2" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button className="btn-secondary" onClick={refreshModels}>Refresh models</button>
+        <button className="btn-primary" onClick={saveAISettings}>Save AI settings</button>
+      </div>
+      {models.length > 0 && (
+        <div className="rounded-xl border border-white/10 p-3 bg-white/5">
+          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Available models</div>
+          <div className="flex flex-wrap gap-2">
+            {models.map((m) => (
+              <button key={m} className="chip" onClick={() => setModel(m)}>{m}</button>
+            ))}
+          </div>
+        </div>
+      )}
       <button className="btn-secondary" onClick={async () => {
         await window.desktopAPI.setOnboardingComplete(false);
         setOnboardingComplete(false);
       }}>Reset onboarding & re-check dependencies</button>
+      <div className="text-slate-400">{status}</div>
       <div className="text-slate-400">AI Provider: Local runtime (Ollama). Project autosave every 2.5s.</div>
     </div>
   );

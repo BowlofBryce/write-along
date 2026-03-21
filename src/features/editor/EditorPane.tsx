@@ -13,6 +13,8 @@ export function EditorPane(): JSX.Element {
   const activeNode = useMemo(() => project.structure.find((n) => n.id === project.selectedNodeId), [project]);
   const updateNodeContent = useAppStore((s) => s.updateNodeContent);
   const manuscriptMode = useAppStore((s) => s.manuscriptMode);
+  const formattingQueue = useAppStore((s) => s.formattingQueue);
+  const clearFormattingQueue = useAppStore((s) => s.clearFormattingQueue);
 
   const editor = useEditor({
     extensions: [
@@ -40,6 +42,16 @@ export function EditorPane(): JSX.Element {
   useEffect(() => {
     if (editor && activeNode) editor.commands.setContent(activeNode.content as any, false);
   }, [activeNode?.id]);
+
+  useEffect(() => {
+    if (!editor || formattingQueue.length === 0) return;
+    for (const command of formattingQueue) {
+      if (command.operation.type === 'setAlignment') {
+        editor.chain().focus().setTextAlign(command.operation.value).run();
+      }
+    }
+    clearFormattingQueue();
+  }, [clearFormattingQueue, editor, formattingQueue]);
 
   useEffect(() => {
     const timer = setInterval(() => {

@@ -15,10 +15,13 @@ interface AppState {
   toggleFocusMode: () => void;
   setManuscriptMode: (mode: 'draft' | 'page') => void;
   setSelectedTab: (tab: AppState['selectedTab']) => void;
+  setProject: (project: StoryProject) => void;
   selectNode: (id: string) => void;
   updateNodeContent: (id: string, content: unknown, wordCount: number) => void;
   addNode: (type: StructureNode['type'], parentId?: string | null) => void;
   queueFormattingCommands: (cmds: FormattingCommand[]) => void;
+  clearFormattingQueue: () => void;
+  addSuggestion: (title: string, detail: string) => void;
   updateMemory: (memory: MemoryObject) => void;
 }
 
@@ -35,6 +38,7 @@ export const useAppStore = create<AppState>((set) => ({
   toggleFocusMode: () => set((state) => ({ focusMode: !state.focusMode })),
   setManuscriptMode: (manuscriptMode) => set({ manuscriptMode }),
   setSelectedTab: (selectedTab) => set({ selectedTab }),
+  setProject: (project) => set({ project }),
   selectNode: (id) => set((state) => ({ project: { ...state.project, selectedNodeId: id } })),
   updateNodeContent: (id, content, wordCount) =>
     set((state) => ({
@@ -71,6 +75,22 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
   queueFormattingCommands: (cmds) => set((state) => ({ formattingQueue: [...state.formattingQueue, ...cmds] })),
+  clearFormattingQueue: () => set({ formattingQueue: [] }),
+  addSuggestion: (title, detail) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        suggestions: [
+          {
+            id: crypto.randomUUID(),
+            type: 'tone' as const,
+            title,
+            detail,
+          },
+          ...state.project.suggestions,
+        ].slice(0, 12),
+      },
+    })),
   updateMemory: (memory) =>
     set((state) => ({
       project: {
