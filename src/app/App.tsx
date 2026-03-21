@@ -8,6 +8,7 @@ export function App(): JSX.Element {
   const setTheme = useAppStore((s) => s.setTheme);
   const onboardingComplete = useAppStore((s) => s.onboardingComplete);
   const setOnboardingComplete = useAppStore((s) => s.setOnboardingComplete);
+  const setProject = useAppStore((s) => s.setProject);
   const [booting, setBooting] = useState(true);
 
   useEffect(() => {
@@ -16,9 +17,17 @@ export function App(): JSX.Element {
       setOnboardingComplete(done === 'true');
       const persistedTheme = await window.desktopAPI.getSetting('theme');
       if (persistedTheme === 'light' || persistedTheme === 'dark') setTheme(persistedTheme);
+      const projects = await window.desktopAPI.listProjects();
+      if (projects.length > 0) {
+        try {
+          setProject(JSON.parse(projects[0].data));
+        } catch {
+          // ignore corrupt payloads and continue with seed project
+        }
+      }
       setBooting(false);
     })();
-  }, [setOnboardingComplete, setTheme]);
+  }, [setOnboardingComplete, setProject, setTheme]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');

@@ -11,6 +11,8 @@ declare global {
       saveProject: (payload: { id: string; title: string; data: string }) => Promise<void>;
       getSetting: (key: string) => Promise<string | null>;
       setSetting: (payload: { key: string; value: string }) => Promise<void>;
+      listAIModels: () => Promise<string[]>;
+      generateAI: (prompt: string) => Promise<string>;
       exportManuscript: (content: string) => Promise<{ ok: boolean; filePath?: string }>;
     };
   }
