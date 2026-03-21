@@ -7,8 +7,24 @@ import { loadProjects, loadSetting, saveProject, saveSetting } from './db';
 import type { DependencyStatus, InstallerStep } from './types';
 
 const execAsync = promisify(exec);
-const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 let mainWindow: BrowserWindow | null = null;
+let logFilePath = '';
+
+function formatLog(scope: string, message: string, extra?: unknown): string {
+  const detail = extra === undefined ? '' : ` ${JSON.stringify(extra, null, 2)}`;
+  return `[${new Date().toISOString()}][${scope}] ${message}${detail}`;
+}
+
+function writeLog(scope: string, message: string, extra?: unknown): void {
+  const line = formatLog(scope, message, extra);
+  console.log(line);
+  if (!logFilePath) return;
+  try {
+    fs.appendFileSync(logFilePath, `${line}\n`, 'utf8');
+  } catch (error) {
+    console.error(formatLog('logger', 'failed to append to log file', error));
+  }
+}
 
 const dependencies = [
   { id: 'homebrew', name: 'Homebrew', purpose: 'Installs local AI runtime tools', check: 'brew --version', installHint: 'Install from brew.sh' },
@@ -80,6 +96,9 @@ async function installDependency(id: string): Promise<InstallerStep> {
 }
 
 function createWindow(): void {
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
+  const isDev = !app.isPackaged && Boolean(devServerUrl);
+
   mainWindow = new BrowserWindow({
     width: 1680,
     height: 980,
@@ -94,15 +113,52 @@ function createWindow(): void {
     },
   });
 
+  mainWindow.webContents.on('did-fail-load', (_, code, description, validatedUrl) => {
+    writeLog('window', 'failed to load content', { code, description, validatedUrl });
+    if (!isDev) {
+      return;
+    }
+
+    const fallbackPath = path.join(__dirname, '../dist/index.html');
+    writeLog('window', 'falling back to local index.html after dev-server load failure', { fallbackPath });
+    mainWindow?.loadFile(fallbackPath);
+  });
+  mainWindow.webContents.on('render-process-gone', (_, details) => {
+    writeLog('window', 'renderer process exited unexpectedly', details);
+  });
+  mainWindow.webContents.on('console-message', (_, level, message, line, sourceId) => {
+    writeLog('renderer.console', message, { level, line, sourceId });
+  });
+
   if (isDev) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL as string);
+    writeLog('window', 'loading from vite dev server', { devServerUrl });
+    mainWindow.loadURL(devServerUrl as string);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    const filePath = path.join(__dirname, '../dist/index.html');
+    writeLog('window', 'loading packaged renderer entry', { filePath });
+    mainWindow.loadFile(filePath);
   }
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  logFilePath = path.join(app.getPath('userData'), 'write-along.log');
+  writeLog('app', 'application ready', {
+    appVersion: app.getVersion(),
+    electronVersion: process.versions.electron,
+    nodeVersion: process.versions.node,
+    platform: process.platform,
+    packaged: app.isPackaged,
+    userData: app.getPath('userData'),
+  });
+  createWindow();
+});
 app.on('window-all-closed', () => app.quit());
+app.on('render-process-gone', (_, webContents, details) => {
+  writeLog('app', 'render-process-gone event', { url: webContents.getURL(), details });
+});
+app.on('child-process-gone', (_, details) => {
+  writeLog('app', 'child-process-gone event', details);
+});
 
 ipcMain.handle('onboarding:check', checkDependencies);
 ipcMain.handle('onboarding:install', (_, id: string) => installDependency(id));
@@ -113,6 +169,10 @@ ipcMain.handle('projects:list', () => loadProjects());
 ipcMain.handle('projects:save', (_, payload: { id: string; title: string; data: string }) => saveProject(payload.id, payload.title, payload.data));
 ipcMain.handle('settings:get', (_, key: string) => loadSetting(key));
 ipcMain.handle('settings:set', (_, payload: { key: string; value: string }) => saveSetting(payload.key, payload.value));
+ipcMain.on('logs:renderer', (_, payload: { level: 'log' | 'warn' | 'error'; message: string; details?: unknown }) => {
+  writeLog(`renderer.${payload.level}`, payload.message, payload.details);
+});
+ipcMain.handle('logs:path', () => logFilePath);
 ipcMain.handle('ai:list-models', async () => {
   const baseUrl = (loadSetting('ai.baseUrl') ?? 'http://127.0.0.1:11434').replace(/\/$/, '');
   try {

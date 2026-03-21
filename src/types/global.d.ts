@@ -14,6 +14,8 @@ declare global {
       listAIModels: () => Promise<string[]>;
       generateAI: (prompt: string) => Promise<string>;
       exportManuscript: (content: string) => Promise<{ ok: boolean; filePath?: string }>;
+      logRenderer: (payload: { level: 'log' | 'warn' | 'error'; message: string; details?: unknown }) => void;
+      getLogFilePath: () => Promise<string>;
     };
   }
 }
