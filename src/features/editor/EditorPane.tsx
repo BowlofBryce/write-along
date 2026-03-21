@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -16,6 +16,33 @@ export function EditorPane(): JSX.Element {
   const formattingQueue = useAppStore((s) => s.formattingQueue);
   const clearFormattingQueue = useAppStore((s) => s.clearFormattingQueue);
   const extractMemoriesFromNode = useAppStore((s) => s.extractMemoriesFromNode);
+  const lastSuggestionUpdateRef = useRef<{ nodeId: string | null; text: string; wordCount: number; timestamp: number }>({
+    nodeId: null,
+    text: '',
+    wordCount: 0,
+    timestamp: 0,
+  });
+
+  function maybeRefreshLiveSuggestions(): void {
+    if (!editor || !activeNode?.id) return;
+    const text = editor.getText().trim();
+    const now = Date.now();
+    const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+    const last = lastSuggestionUpdateRef.current;
+    const nodeChanged = last.nodeId !== activeNode.id;
+    const contentChanged = text !== last.text;
+    const wordDeltaReached = Math.abs(words - last.wordCount) >= 50;
+    const timeDeltaReached = now - last.timestamp >= 30_000;
+    const shouldRefresh = nodeChanged || wordDeltaReached || (timeDeltaReached && contentChanged);
+    if (!shouldRefresh) return;
+    extractMemoriesFromNode(activeNode.id);
+    lastSuggestionUpdateRef.current = {
+      nodeId: activeNode.id,
+      text,
+      wordCount: words,
+      timestamp: now,
+    };
+  }
 
   const editor = useEditor({
     extensions: [
@@ -45,6 +72,15 @@ export function EditorPane(): JSX.Element {
   }, [activeNode?.id]);
 
   useEffect(() => {
+    lastSuggestionUpdateRef.current = {
+      nodeId: activeNode?.id ?? null,
+      text: '',
+      wordCount: 0,
+      timestamp: 0,
+    };
+  }, [activeNode?.id]);
+
+  useEffect(() => {
     if (!editor || formattingQueue.length === 0) return;
     for (const command of formattingQueue) {
       if (command.operation.type === 'setAlignment') {
@@ -61,12 +97,10 @@ export function EditorPane(): JSX.Element {
         title: project.title,
         data: JSON.stringify(project),
       });
-      if (activeNode?.id) {
-        setTimeout(() => extractMemoriesFromNode(activeNode.id), 0);
-      }
+      maybeRefreshLiveSuggestions();
     }, 2500);
     return () => clearInterval(timer);
-  }, [activeNode?.id, extractMemoriesFromNode, project]);
+  }, [editor, project]);
 
   return (
     <main className="flex-1 overflow-y-auto bg-surface-100/70 dark:bg-surface-950">

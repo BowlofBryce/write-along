@@ -34,29 +34,52 @@ export function AIPanel(): JSX.Element {
 function SuggestionsTab(): JSX.Element {
   const suggestions = useAppStore((s) => s.project.suggestions);
   const addSuggestion = useAppStore((s) => s.addSuggestion);
-  const removeSuggestion = useAppStore((s) => s.removeSuggestion);
+  const uniqueSuggestions = useMemo(
+    () =>
+      suggestions.filter(
+        (suggestion, index, all) =>
+          all.findIndex((candidate) => candidate.title === suggestion.title && candidate.detail === suggestion.detail) === index,
+      ),
+    [suggestions],
+  );
+  const latestSuggestion = uniqueSuggestions[0];
+  const earlierSuggestions = uniqueSuggestions.slice(1, 5);
+
   return (
     <div className="space-y-3">
-      {suggestions.map((s) => (
-        <article key={s.id} className="card">
-          <div className="text-xs uppercase tracking-wider text-indigo-400 mb-1">{s.type}</div>
-          <h3 className="font-medium">{s.title}</h3>
-          <p className="text-sm text-slate-400 mt-1">{s.detail}</p>
-          <div className="mt-3 flex gap-2 text-xs">
-            <button className="chip" onClick={() => removeSuggestion(s.id)}>Dismiss</button>
-            <button
-              className="chip"
-              onClick={async () => {
-                const response = await window.desktopAPI.generateAI(`Explain this writing suggestion briefly and concretely:\nTitle: ${s.title}\nDetail: ${s.detail}`);
-                addSuggestion(`Why: ${s.title}`, response);
-              }}
-            >
-              Ask why
-            </button>
-            <button className="chip">Pin memory</button>
+      <article className="card">
+        <div className="text-xs uppercase tracking-wider text-indigo-400 mb-2">Live coach</div>
+        {!latestSuggestion && (
+          <p className="text-sm text-slate-400">Suggestions appear here while you write. We only refresh when your draft meaningfully changes.</p>
+        )}
+        {latestSuggestion && (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-xs uppercase tracking-wider text-slate-400">{latestSuggestion.type}</p>
+              <h3 className="font-medium mt-1">{latestSuggestion.title}</h3>
+              <p className="text-sm text-slate-300 mt-1">{latestSuggestion.detail}</p>
+            </div>
+            {earlierSuggestions.length > 0 && (
+              <div className="space-y-2">
+                {earlierSuggestions.map((suggestion) => (
+                  <p key={suggestion.id} className="text-sm text-slate-400">• {suggestion.detail}</p>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 text-xs">
+              <button
+                className="chip"
+                onClick={async () => {
+                  const response = await window.desktopAPI.generateAI(`Explain this writing suggestion briefly and concretely:\nTitle: ${latestSuggestion.title}\nDetail: ${latestSuggestion.detail}`);
+                  addSuggestion(`Why: ${latestSuggestion.title}`, response);
+                }}
+              >
+                Ask why
+              </button>
+            </div>
           </div>
-        </article>
-      ))}
+        )}
+      </article>
     </div>
   );
 }
