@@ -6,6 +6,7 @@ export function StructureSidebar(): JSX.Element {
   const project = useAppStore((s) => s.project);
   const selectNode = useAppStore((s) => s.selectNode);
   const addNode = useAppStore((s) => s.addNode);
+  const deleteNode = useAppStore((s) => s.deleteNode);
   const [query, setQuery] = useState('');
 
   const nodes = useMemo(
@@ -33,7 +34,18 @@ export function StructureSidebar(): JSX.Element {
           >
             <div className="flex justify-between items-center">
               <div className="text-sm font-medium">{node.title}</div>
-              <span className="text-xs text-slate-400">{node.metadata.wordCount}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">{node.metadata.wordCount}</span>
+                <button
+                  className="chip"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteNode(node.id);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{node.type} · {node.metadata.status ?? 'Draft'}</div>
           </button>
