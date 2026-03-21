@@ -81,6 +81,11 @@ Optional launcher modes:
 - `./launcher --dev` → force development mode
 - `./launcher --build` → force a rebuild before launch
 
+If you were seeing a blank window in launcher-based runs, this is now handled more safely:
+- the app only uses the Vite dev-server URL when Electron is **not packaged**
+- if dev-server loading fails, Electron falls back to `dist/index.html` automatically
+- load failures and renderer crashes are written to a persistent log file for diagnosis
+
 If you hit a native module mismatch error like:
 `better-sqlite3.node was compiled against a different Node.js version`
 run:
@@ -90,6 +95,22 @@ npm run rebuild:native
 ```
 
 The launcher and `npm run dev` / `npm run start` now run this automatically before launching.
+
+### Debug logging
+
+Write Along now writes app + renderer diagnostics to:
+
+- macOS: `~/Library/Application Support/Write Along/write-along.log`
+- Linux: `~/.config/Write Along/write-along.log`
+- Windows: `%APPDATA%/Write Along/write-along.log`
+
+The log includes:
+- startup/runtime environment details
+- renderer console messages
+- renderer crashes and failed page loads
+- uncaught renderer errors and unhandled promise rejections
+
+The same diagnostics are also echoed to terminal/stdout while running via `./launcher`, `npm run start`, or `npm run dev`.
 
 ### Configure local AI models in-app
 
