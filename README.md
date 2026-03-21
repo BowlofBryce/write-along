@@ -86,6 +86,13 @@ It will install dependencies if needed, then:
 
 The app will use these saved values for all AI actions (Ask the Story, content rewrites, summaries, and suggestion explanations).
 
+### Dynamic memory engine behavior
+
+- Memory extraction runs from the current scene during autosave and via **Refresh memory from current scene** in the Memory tab.
+- New candidate memories are consolidated (create/update/reinforce/contradiction state) instead of simple append-only notes.
+- Retrieval builds an active memory slate using hybrid reranking (trait score + lexical/entity overlap + pin/state effects).
+- Memory objects are directly editable with controls for pin, demote, archive, ambiguity, wrong/contradicted, and delete.
+
 ### Build desktop bundles
 
 ```bash

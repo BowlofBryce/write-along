@@ -18,19 +18,29 @@ export type StructureNode = {
 
 export type MemoryObject = {
   id: string;
-  text: string;
-  sources: Array<{ nodeId: string; quote: string }>;
+  projectId: string;
+  content: string;
+  explicitness: 'explicit' | 'inferred' | 'speculative';
+  sources: Array<{ nodeId: string; quote: string; capturedAt: string }>;
+  userNotes?: string;
+  linkedEntityIds: string[];
+  linkedMemoryIds: string[];
+  contradictionIds: string[];
   importance: number;
   durability: number;
+  scope: number;
   retrievalPriority: number;
   confidence: number;
-  state: 'active' | 'inactive' | 'archived';
+  recencyScore: number;
+  activationCount: number;
+  dependencyCount: number;
+  state: 'tentative' | 'active' | 'archived' | 'contradicted' | 'superseded';
   userPinned: boolean;
   userEdited: boolean;
-  contradiction?: string;
   intentionalAmbiguity?: boolean;
-  linkedMemoryIds: string[];
-  lastTouchedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  lastRetrievedAt?: string;
 };
 
 export type Suggestion = {

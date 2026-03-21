@@ -15,6 +15,7 @@ export function EditorPane(): JSX.Element {
   const manuscriptMode = useAppStore((s) => s.manuscriptMode);
   const formattingQueue = useAppStore((s) => s.formattingQueue);
   const clearFormattingQueue = useAppStore((s) => s.clearFormattingQueue);
+  const extractMemoriesFromNode = useAppStore((s) => s.extractMemoriesFromNode);
 
   const editor = useEditor({
     extensions: [
@@ -60,9 +61,12 @@ export function EditorPane(): JSX.Element {
         title: project.title,
         data: JSON.stringify(project),
       });
+      if (activeNode?.id) {
+        setTimeout(() => extractMemoriesFromNode(activeNode.id), 0);
+      }
     }, 2500);
     return () => clearInterval(timer);
-  }, [project]);
+  }, [activeNode?.id, extractMemoriesFromNode, project]);
 
   return (
     <main className="flex-1 overflow-y-auto bg-surface-100/70 dark:bg-surface-950">

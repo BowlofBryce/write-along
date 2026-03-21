@@ -34,6 +34,7 @@ export function AIPanel(): JSX.Element {
 function SuggestionsTab(): JSX.Element {
   const suggestions = useAppStore((s) => s.project.suggestions);
   const addSuggestion = useAppStore((s) => s.addSuggestion);
+  const removeSuggestion = useAppStore((s) => s.removeSuggestion);
   return (
     <div className="space-y-3">
       {suggestions.map((s) => (
@@ -42,7 +43,7 @@ function SuggestionsTab(): JSX.Element {
           <h3 className="font-medium">{s.title}</h3>
           <p className="text-sm text-slate-400 mt-1">{s.detail}</p>
           <div className="mt-3 flex gap-2 text-xs">
-            <button className="chip">Dismiss</button>
+            <button className="chip" onClick={() => removeSuggestion(s.id)}>Dismiss</button>
             <button
               className="chip"
               onClick={async () => {
@@ -68,9 +69,9 @@ function AskTab(): JSX.Element {
 
   async function ask(): Promise<void> {
     if (!query.trim()) return;
-    const relevant = active.filter((m) => query.toLowerCase().split(' ').some((word) => m.text.toLowerCase().includes(word)));
+    const relevant = active.filter((m) => query.toLowerCase().split(' ').some((word) => m.content.toLowerCase().includes(word)));
     const memoryContext = relevant.length
-      ? relevant.map((m) => `- ${m.text} (confidence ${Math.round(m.confidence * 100)}%)`).join('\n')
+      ? relevant.map((m) => `- ${m.content} (confidence ${Math.round(m.confidence * 100)}%)`).join('\n')
       : '- No direct memory matches.';
     const aiAnswer = await window.desktopAPI.generateAI(
       `You are assisting a novelist. Answer this query in <= 120 words.\nQuery: ${query}\nMemory context:\n${memoryContext}`,
@@ -90,19 +91,28 @@ function AskTab(): JSX.Element {
 function MemoryTab(): JSX.Element {
   const memories = useAppStore((s) => s.project.memories);
   const updateMemory = useAppStore((s) => s.updateMemory);
+  const removeMemory = useAppStore((s) => s.removeMemory);
+  const activeNodeId = useAppStore((s) => s.project.selectedNodeId);
+  const extractMemoriesFromNode = useAppStore((s) => s.extractMemoriesFromNode);
   const [query, setQuery] = useState('');
   return (
     <div className="space-y-3">
+      <button className="btn-secondary w-full" onClick={() => extractMemoriesFromNode(activeNodeId)}>Refresh memory from current scene</button>
       <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search memory" />
       {memories
-        .filter((m) => m.text.toLowerCase().includes(query.toLowerCase()))
+        .filter((m) => m.content.toLowerCase().includes(query.toLowerCase()))
         .map((memory) => (
           <div key={memory.id} className="card">
-            <textarea className="input min-h-16" value={memory.text} onChange={(e) => updateMemory({ ...memory, text: e.target.value, userEdited: true })} />
+            <textarea className="input min-h-16" value={memory.content} onChange={(e) => updateMemory({ ...memory, content: e.target.value, userEdited: true, updatedAt: new Date().toISOString() })} />
+            <div className="mt-2 text-xs text-slate-400">State: {memory.state} · Confidence: {Math.round(memory.confidence * 100)}% · Activations: {memory.activationCount}</div>
+            {memory.sources[0] && <div className="mt-1 text-xs text-slate-500">Source: {memory.sources[0].nodeId} — “{memory.sources[0].quote}”</div>}
             <div className="mt-2 flex gap-2 text-xs">
               <button className="chip" onClick={() => updateMemory({ ...memory, userPinned: !memory.userPinned })}>{memory.userPinned ? 'Unpin' : 'Pin'}</button>
+              <button className="chip" onClick={() => updateMemory({ ...memory, retrievalPriority: Math.max(0, memory.retrievalPriority - 0.15) })}>Demote</button>
               <button className="chip" onClick={() => updateMemory({ ...memory, state: 'archived' })}>Archive</button>
-              <button className="chip" onClick={() => updateMemory({ ...memory, contradiction: 'Marked by user' })}>Mark wrong</button>
+              <button className="chip" onClick={() => updateMemory({ ...memory, state: 'contradicted' })}>Mark wrong</button>
+              <button className="chip" onClick={() => updateMemory({ ...memory, intentionalAmbiguity: !memory.intentionalAmbiguity })}>Ambiguous</button>
+              <button className="chip" onClick={() => removeMemory(memory.id)}>Delete</button>
             </div>
           </div>
         ))}
