@@ -9,5 +9,7 @@ contextBridge.exposeInMainWorld('desktopAPI', {
   saveProject: (payload: { id: string; title: string; data: string }) => ipcRenderer.invoke('projects:save', payload),
   getSetting: (key: string) => ipcRenderer.invoke('settings:get', key),
   setSetting: (payload: { key: string; value: string }) => ipcRenderer.invoke('settings:set', payload),
+  listAIModels: () => ipcRenderer.invoke('ai:list-models'),
+  generateAI: (prompt: string) => ipcRenderer.invoke('ai:generate', prompt),
   exportManuscript: (content: string) => ipcRenderer.invoke('dialog:export', content),
 });

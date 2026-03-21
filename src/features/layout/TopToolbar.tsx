@@ -12,7 +12,19 @@ export function TopToolbar(): JSX.Element {
   const project = useAppStore((s) => s.project);
 
   async function exportMarkdown(): Promise<void> {
-    const content = project.structure.map((n) => `## ${n.title}\n\n${JSON.stringify(n.content)}`).join('\n\n');
+    const toPlainText = (node: any): string => {
+      if (!node) return '';
+      if (typeof node.text === 'string') return node.text;
+      if (Array.isArray(node)) return node.map(toPlainText).join('');
+      if (Array.isArray(node.content)) {
+        const inner = node.content.map(toPlainText).join('');
+        if (node.type === 'paragraph') return `${inner}\n\n`;
+        if (node.type === 'heading') return `${inner}\n\n`;
+        return inner;
+      }
+      return '';
+    };
+    const content = project.structure.map((n) => `## ${n.title}\n\n${toPlainText(n.content)}`).join('\n');
     await window.desktopAPI.exportManuscript(content);
   }
 

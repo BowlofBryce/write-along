@@ -113,6 +113,37 @@ ipcMain.handle('projects:list', () => loadProjects());
 ipcMain.handle('projects:save', (_, payload: { id: string; title: string; data: string }) => saveProject(payload.id, payload.title, payload.data));
 ipcMain.handle('settings:get', (_, key: string) => loadSetting(key));
 ipcMain.handle('settings:set', (_, payload: { key: string; value: string }) => saveSetting(payload.key, payload.value));
+ipcMain.handle('ai:list-models', async () => {
+  const baseUrl = (loadSetting('ai.baseUrl') ?? 'http://127.0.0.1:11434').replace(/\/$/, '');
+  try {
+    const response = await fetch(`${baseUrl}/api/tags`);
+    if (!response.ok) return [];
+    const payload = (await response.json()) as { models?: Array<{ name?: string }> };
+    return (payload.models ?? []).map((m) => m.name).filter((name): name is string => Boolean(name));
+  } catch {
+    return [];
+  }
+});
+ipcMain.handle('ai:generate', async (_, prompt: string) => {
+  const model = loadSetting('ai.model') ?? 'llama3.2';
+  const baseUrl = (loadSetting('ai.baseUrl') ?? 'http://127.0.0.1:11434').replace(/\/$/, '');
+  try {
+    const response = await fetch(`${baseUrl}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+      }),
+    });
+    if (!response.ok) return `AI call failed with status ${response.status}.`;
+    const payload = (await response.json()) as { response?: string };
+    return payload.response?.trim() || 'AI returned an empty response.';
+  } catch {
+    return `Unable to reach local AI runtime at ${baseUrl}. Confirm Ollama is running and model "${model}" is available.`;
+  }
+});
 ipcMain.handle('dialog:export', async (_, content: string) => {
   if (!mainWindow) return { ok: false };
   const result = await dialog.showSaveDialog(mainWindow, {
