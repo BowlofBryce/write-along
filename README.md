@@ -70,6 +70,43 @@ npm install
 npm run dev
 ```
 
+### Launch without typing commands
+
+You can run the repository-root `launcher` executable (double-click in Finder or run `./launcher`).  
+It will install dependencies if needed, then:
+- build missing desktop artifacts automatically (`dist` + `dist-electron`) to avoid Electron “Cannot find module ... dist-electron/main.js” errors
+- launch the desktop app once artifacts are ready
+
+Optional launcher modes:
+- `./launcher --dev` → force development mode
+- `./launcher --build` → force a rebuild before launch
+
+If you hit a native module mismatch error like:
+`better-sqlite3.node was compiled against a different Node.js version`
+run:
+
+```bash
+npm run rebuild:native
+```
+
+The launcher and `npm run dev` / `npm run start` now run this automatically before launching.
+
+### Configure local AI models in-app
+
+1. Open **Settings** in the AI panel.
+2. Set your local runtime URL (default: `http://127.0.0.1:11434`).
+3. Click **Refresh models** to fetch installed models from Ollama.
+4. Choose a model chip (or type one manually), then click **Save AI settings**.
+
+The app will use these saved values for all AI actions (Ask the Story, content rewrites, summaries, and suggestion explanations).
+
+### Dynamic memory engine behavior
+
+- Memory extraction runs from the current scene during autosave and via **Refresh memory from current scene** in the Memory tab.
+- New candidate memories are consolidated (create/update/reinforce/contradiction state) instead of simple append-only notes.
+- Retrieval builds an active memory slate using hybrid reranking (trait score + lexical/entity overlap + pin/state effects).
+- Memory objects are directly editable with controls for pin, demote, archive, ambiguity, wrong/contradicted, and delete.
+
 ### Build desktop bundles
 
 ```bash
