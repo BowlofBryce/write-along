@@ -10,6 +10,9 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
+echo "Rebuilding native dependencies for current Electron version..."
+npm run rebuild:native
+
 if [ "$MODE" = "--dev" ]; then
   npm run dev
   exit 0

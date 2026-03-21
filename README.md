@@ -81,6 +81,16 @@ Optional launcher modes:
 - `./launcher --dev` → force development mode
 - `./launcher --build` → force a rebuild before launch
 
+If you hit a native module mismatch error like:
+`better-sqlite3.node was compiled against a different Node.js version`
+run:
+
+```bash
+npm run rebuild:native
+```
+
+The launcher and `npm run dev` / `npm run start` now run this automatically before launching.
+
 ### Configure local AI models in-app
 
 1. Open **Settings** in the AI panel.
