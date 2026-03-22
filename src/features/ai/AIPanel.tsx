@@ -33,7 +33,6 @@ export function AIPanel(): JSX.Element {
 
 function SuggestionsTab(): JSX.Element {
   const suggestions = useAppStore((s) => s.project.suggestions);
-  const addSuggestion = useAppStore((s) => s.addSuggestion);
   const uniqueSuggestions = useMemo(
     () =>
       suggestions.filter(
@@ -44,6 +43,27 @@ function SuggestionsTab(): JSX.Element {
   );
   const latestSuggestion = uniqueSuggestions[0];
   const earlierSuggestions = uniqueSuggestions.slice(1, 5);
+  const [whyResponse, setWhyResponse] = useState('');
+  const [isFetchingWhy, setIsFetchingWhy] = useState(false);
+
+  useEffect(() => {
+    setWhyResponse('');
+    setIsFetchingWhy(false);
+  }, [latestSuggestion?.id]);
+
+  async function askWhy(): Promise<void> {
+    if (!latestSuggestion || isFetchingWhy) return;
+    setIsFetchingWhy(true);
+    setWhyResponse('Thinking about why this matters for your story...');
+    try {
+      const response = await window.desktopAPI.generateAI(
+        `Explain this writing suggestion briefly and concretely. Give 2 bullet points and one immediate next step.\nTitle: ${latestSuggestion.title}\nDetail: ${latestSuggestion.detail}`,
+      );
+      setWhyResponse(response);
+    } finally {
+      setIsFetchingWhy(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -68,15 +88,14 @@ function SuggestionsTab(): JSX.Element {
             )}
             <div className="flex gap-2 text-xs">
               <button
-                className="chip"
-                onClick={async () => {
-                  const response = await window.desktopAPI.generateAI(`Explain this writing suggestion briefly and concretely:\nTitle: ${latestSuggestion.title}\nDetail: ${latestSuggestion.detail}`);
-                  addSuggestion(`Why: ${latestSuggestion.title}`, response);
-                }}
+                className={`chip ${isFetchingWhy ? 'opacity-70 cursor-not-allowed' : ''}`}
+                disabled={isFetchingWhy}
+                onClick={() => void askWhy()}
               >
-                Ask why
+                {isFetchingWhy ? 'Asking why…' : 'Ask why'}
               </button>
             </div>
+            {whyResponse && <pre className="card whitespace-pre-wrap text-xs">{whyResponse}</pre>}
           </div>
         )}
       </article>
@@ -118,9 +137,31 @@ function MemoryTab(): JSX.Element {
   const activeNodeId = useAppStore((s) => s.project.selectedNodeId);
   const extractMemoriesFromNode = useAppStore((s) => s.extractMemoriesFromNode);
   const [query, setQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState('Memory refresh runs when your scene changes, or manually from this button.');
+
+  async function handleRefreshMemory(): Promise<void> {
+    if (!activeNodeId || isRefreshing) return;
+    setIsRefreshing(true);
+    const before = memories.length;
+    await Promise.resolve();
+    extractMemoriesFromNode(activeNodeId);
+    const after = useAppStore.getState().project.memories.length;
+    const delta = after - before;
+    setRefreshMessage(delta > 0 ? `Refreshed from current scene (+${delta} memories).` : 'Refreshed from current scene (no new durable memories found).');
+    setIsRefreshing(false);
+  }
+
   return (
     <div className="space-y-3">
-      <button className="btn-secondary w-full" onClick={() => extractMemoriesFromNode(activeNodeId)}>Refresh memory from current scene</button>
+      <button
+        className={`btn-secondary w-full ${isRefreshing ? 'opacity-70 cursor-not-allowed' : ''}`}
+        disabled={!activeNodeId || isRefreshing}
+        onClick={() => void handleRefreshMemory()}
+      >
+        {isRefreshing ? 'Refreshing memory…' : 'Refresh memory from current scene'}
+      </button>
+      <p className="text-xs text-slate-400">{refreshMessage}</p>
       <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search memory" />
       {memories
         .filter((m) => m.content.toLowerCase().includes(query.toLowerCase()))

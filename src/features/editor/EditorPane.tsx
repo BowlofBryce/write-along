@@ -31,8 +31,8 @@ export function EditorPane(): JSX.Element {
     const last = lastSuggestionUpdateRef.current;
     const nodeChanged = last.nodeId !== activeNode.id;
     const contentChanged = text !== last.text;
-    const wordDeltaReached = Math.abs(words - last.wordCount) >= 50;
-    const timeDeltaReached = now - last.timestamp >= 30_000;
+    const wordDeltaReached = Math.abs(words - last.wordCount) >= 10;
+    const timeDeltaReached = now - last.timestamp >= 8_000;
     const shouldRefresh = nodeChanged || wordDeltaReached || (timeDeltaReached && contentChanged);
     if (!shouldRefresh) return;
     extractMemoriesFromNode(activeNode.id);
@@ -64,6 +64,7 @@ export function EditorPane(): JSX.Element {
     onUpdate: ({ editor: ed }) => {
       const words = ed.getText().trim().split(/\s+/).filter(Boolean).length;
       if (activeNode) updateNodeContent(activeNode.id, ed.getJSON(), words);
+      maybeRefreshLiveSuggestions();
     },
   });
 
